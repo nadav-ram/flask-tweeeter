@@ -1,10 +1,10 @@
 {% set id = post.id %}
 <a href="/post/{{post.id}}" class="has-text-dark">
-    <div class="box" id="{{id}}">
+    <div class="box" id="{{id}}" style="position: relative;">
         <article class="media">
             <figure class="media-left">
                 <p class="image is-64x64">
-                    {% set profile_pic = url_for('static', filename='profile_pics/' + post.author.image_file) %}
+                    {% set profile_pic = url_for('static', filename='profile_pics/default.jpg' ) %}
                     <img src="{{ profile_pic }}" style="width: 64px; height: 64px;" class="profile">
                 </p>
             </figure>
@@ -133,6 +133,88 @@
                 </div>
 
             </div>
+            <div class="media-right">
+                <button class="button" onclick="user_blurBox(this.parentNode.parentNode.parentNode.id)">Toxic</button>
+                <script>
+                    
+                    function user_blurBox(elem) {
+                        var boxElem = document.getElementById(elem);
+                        var mediaElem = document.getElementById(elem).getElementsByClassName("media")[0];
+                        mediaElem.style = "pointer-events: none; filter: blur(10px);";
+                        //boxElem.getElementsByClassName("button")[1].style = "float: right; display: block;";
+                        boxElem.getElementsByClassName("button")[1].style = "position: absolute; top: 20px; right: 20px; display: block;";
+                        sendData(elem, 1);
+                    }
+
+                    
+                </script>
+            </div>
+            
+
         </article>
+        <button class="button" onclick="unblurBox(this.parentNode.id)" style="display: none;">Reveal</button>
+        <script>
+            function unblurBox(elem) {
+                var boxElem = document.getElementById(elem);
+                var mediaElem = document.getElementById(elem).getElementsByClassName("media")[0];
+                mediaElem.style = "";
+                boxElem.getElementsByClassName("button")[1].style = "display: none;";
+                sendData(elem, 0);
+            }
+        </script>
+
+        <script>
+        function sendData(elem, user_label) {
+            var data = JSON.stringify({
+                        user_id: {{user.id}},
+                        action: user_label,
+                        label: user_label,
+                        tweet_id: parseInt(elem)
+                });
+            console.log(data);
+
+            fetch('/', {
+                method: "POST",
+                headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+                },
+                body: data
+                })
+                .then(res => JSON.stringify(res.json()))
+                .catch(err => console.log(err))
+            }
+
+            function blurBox(elem) {
+                var boxElem = document.getElementById(elem);
+                var mediaElem = document.getElementById(elem).getElementsByClassName("media")[0];
+                mediaElem.style = "pointer-events: none; filter: blur(10px);";
+                //boxElem.getElementsByClassName("button")[1].style = "float: right; display: block;";
+                boxElem.getElementsByClassName("button")[1].style = "position: absolute; top: 20px; right: 20px; display: block;";
+               
+            }
+            function blurBoxAuto(elem){
+                var SCORE_TARGET = 0.8;
+                var score_toxicity = {{post.toxicity}} * {{user.toxicity}};
+                var score_profanity = {{post.profanity}} * {{user.profanity}};
+                var score_threat = {{post.threat}} * {{user.threat}};
+                var score_identity_attack = {{post.identity_attack}} * {{user.identity_attack}};
+                var score_insult = {{post.insult}} * {{user.insult}};
+                var score_sexually_explicit = {{post.sexually_explicit}} * {{user.sexually_explicit}};
+                var score_flirtation = {{post.flirtation}} * {{user.flirtation}};
+                var score = score_toxicity + score_profanity + score_threat + score_identity_attack + score_insult + score_sexually_explicit + score_flirtation;
+                var inv_logit = 1 / (1 + Math.exp(-score));
+                if (inv_logit > SCORE_TARGET) {
+                    blurBox(elem);
+                }   
+                
+            }
+            
+            blurBoxAuto({{id}});
+        </script>
+        <p> toxicity: {{post.toxicity}}, threat: {{post.threat}}, flirtation: {{post.flirtation}}, <br>
+            identity attack: {{post.identity_attack}},
+            sexually explicit: {{post.sexually_explicit}}
+        </p>
     </div>
 </a>

@@ -7,6 +7,11 @@ from passlib.hash import sha256_crypt
 import os
 from werkzeug.utils import secure_filename
 from functools import wraps
+import moderation
+from sqlalchemy import update
+import pandas as pd
+from random import randrange
+from datetime import timedelta
 
 ##########################  CONFIG  ####################################
 
@@ -41,6 +46,7 @@ followers = db.Table('follows',
 
 # User model
 class User(db.Model):
+    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(25), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -54,7 +60,14 @@ class User(db.Model):
                                primaryjoin=(followers.c.follower_id == id),
                                secondaryjoin=(followers.c.followed_id == id),
                                backref=db.backref('followers', lazy='dynamic'), lazy='dynamic')
-
+    toxicity = db.Column(db.Float, default=1/7, unique=False)
+    threat = db.Column(db.Float, default=1/7, unique=False)
+    sexually_explicit = db.Column(db.Float, default=1/7, unique=False)
+    profanity = db.Column(db.Float, default=1/7, unique=False)
+    insult = db.Column(db.Float, default=1/7, unique=False)
+    identity_attack = db.Column(db.Float, default=1/7, unique=False)
+    flirtation = db.Column(db.Float, default=1/7, unique=False)
+    actions = db.relationship('Action', backref='user')
     # Defines how a user object will be printed in the shell
     def __repr__(self):
         return f"User ('{self.username}', '{self.email}', '{self.id}')"
@@ -62,6 +75,7 @@ class User(db.Model):
 
 # Post model
 class Post(db.Model):
+    __tablename__='post'
     id = db.Column(db.Integer, primary_key=True)
     date_posted = db.Column(db.DateTime, nullable=False,
                             default=datetime.utcnow)
@@ -69,13 +83,49 @@ class Post(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     retweet = db.Column(db.Integer, default=None, nullable=True, unique=False)
     comment = db.Column(db.Integer, default=None, nullable=True, unique=False)
-
+    toxicity = db.Column(db.Float, default=0.0, unique=False, nullable=True)
+    threat = db.Column(db.Float, default=0.0, unique=False, nullable=True)
+    sexually_explicit = db.Column(db.Float, default=0.0, unique=False)
+    profanity = db.Column(db.Float, default=0.0, unique=False)
+    insult = db.Column(db.Float, default=0.0, unique=False)
+    identity_attack = db.Column(db.Float, default=0.0, unique=False)
+    flirtation = db.Column(db.Float, default=0.0, unique=False)
+    
     # Defines how a post object will be printed in the shell
     def __repr__(self):
         return f"Post ('{self.id}', '{self.date_posted}')"
 
+class Action(db.Model):
+    __tablename__='action'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    action = db.Column(db.Integer, unique=False, nullable=True)
+    label = db.Column(db.Integer, unique=False, nullable=True)
+    toxicity = db.Column(db.Float, default=0.0, unique=False, nullable=True)
+    threat = db.Column(db.Float, default=0.0, unique=False, nullable=True)
+    sexually_explicit = db.Column(db.Float, default=0.0, unique=False)
+    profanity = db.Column(db.Float, default=0.0, unique=False)
+    insult = db.Column(db.Float, default=0.0, unique=False)
+    identity_attack = db.Column(db.Float, default=0.0, unique=False)
+    flirtation = db.Column(db.Float, default=0.0, unique=False)
+    # Defines how a post object will be printed in the shell
+    def __repr__(self):
+        return f"Post ('{self.user_id}', '{self.action}')"
+
 
 ##################################  UTILS #####################################
+
+
+def random_date(start, end):
+    """
+    This function will return a random datetime between two datetime 
+    objects.
+    """
+    delta = end - start
+    int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
+    random_second = randrange(int_delta)
+    return start + timedelta(seconds=random_second)
+
 
 # Check if user logged in
 def is_logged_in(f):
@@ -96,11 +146,54 @@ def current_user():
     else:
         return None
 
+############################    Modify database #############################
+
+## write to database
+
+# engine = db.get_engine()
+# with open('new.csv', 'rb') as f:
+#     df = pd.read_csv('new.csv')
+#     df['date_posted'] =  random_date(datetime.strptime('1/1/2020 1:30 PM', '%m/%d/%Y %I:%M %p'), datetime.strptime('12/1/2020 1:30 PM', '%m/%d/%Y %I:%M %p'))
+#     df = df.assign(date_posted=pd.to_datetime(df['date_posted'],dayfirst=True, errors='coerce'))
+# df.to_sql('post',
+#           con=engine,
+#           index=False,
+#           index_label='id',
+#           if_exists='replace')
+
+## Change date of each post
+# posts = Post.query.all()
+# for post in posts:
+#     post.date_posted = random_date(datetime.strptime('1/1/2020 1:30 PM', '%m/%d/%Y %I:%M %p'), datetime.strptime('12/1/2020 1:30 PM', '%m/%d/%Y %I:%M %p'))
+#     db.session.commit()
+
+
+## Adding csv data to the table 
+# engine = db.get_engine()
+# with open('df-user-scores.csv', 'rb') as f:
+#     df = pd.read_csv('df-user-scores.csv')
+# names = ['User_A','User_B','User_C']
+# for i in range(len(names)):
+#     user = User.query.filter_by(username=names[i]).first()
+#     user.flirtation = df['w1'].iloc[i]
+#     user.identity_attack = df['w2'].iloc[i]
+#     user.sexually_explicit = df['w3'].iloc[i]
+#     user.threat = df['w4'].iloc[i]
+#     user.toxicity = df['w5'].iloc[i]
+#     db.session.commit()
+
+## write action table to csv to check
+# engine = db.get_engine()
+# action_data =db.session.query(Action).all()
+# # df = pd.DataFrame(action_data)
+# df= pd.read_sql_table('action', engine)
+# print(df)
+# df.to_csv('out.csv', index=False)
 
 ############################    ROUTES  #####################################
 
 # Home route (default)
-@app.route('/')
+@app.route('/', methods=['GET','POST'])
 def home():
     posts = Post.query.filter_by(comment=None).all()
     follow_suggestions = User.query.all()[0:6]
@@ -110,6 +203,27 @@ def home():
         if current_user() in follow_suggestions:  # If the current user is in the user's follow suggestions
             follow_suggestions.remove(current_user())
 
+    data = None
+    if request.method == 'POST':
+        data = request.get_json()
+        print("user action: ", data)
+    if data != None:
+        tweet = Post.query.filter_by(id=data['tweet_id']).first()
+        user_action = {
+            'user_id':data['user_id'],
+            'action':data['action'],
+            'label': data['label'],
+            'toxicity':tweet.toxicity,
+            'threat':tweet.threat, 
+            'sexually_explicit': tweet.sexually_explicit,
+            'profanity': tweet.profanity,
+            'insult':tweet.insult, 
+            'identity_attack': tweet.identity_attack,
+            'flirtation': tweet.flirtation
+        }
+        action = Action(**user_action)
+        db.session.add(action)
+        db.session.commit()
     return render_template('home.html', posts=posts, user=current_user(), Post_model=Post, likes=likes, follow_suggestions=follow_suggestions, User=User)
 
 
