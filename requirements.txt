@@ -1,5 +1,5 @@
 WTForms==2.2.1
-Flask==1.0.2
+Flask==2.3.2
 passlib==1.7.1
 Werkzeug==0.16.0
 alembic==1.0.8
